@@ -5,7 +5,7 @@ import org.jetbrains.annotations.Nullable;
 
 public class OpenApiException extends Exception {
 
-    static final long serialVersionUID = -3387516993124229948L;
+    private static final long serialVersionUID = -3387516993124229948L;
 
     @Nullable
     private Error error;

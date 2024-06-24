@@ -79,7 +79,8 @@ class OpenAiV1ClientTest {
                 );
 
         //When
-        List<Model> models = openAiClient.getModels();
+        Result<List<Model>> result = openAiClient.getModels();
+        List<Model> models = result.get();
 
         //Then
         assertEquals(1, models.size());
@@ -119,7 +120,7 @@ class OpenAiV1ClientTest {
 
         //When
         OpenApiException openApiException = assertThrows(OpenApiException.class, () -> {
-            openAiClient.getModels();
+            openAiClient.getModels().get();
         });
 
         assertEquals("Request to GET /v1/models returned http code 401", openApiException.getMessage());

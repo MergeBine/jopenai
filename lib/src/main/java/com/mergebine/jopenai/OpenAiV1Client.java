@@ -12,11 +12,11 @@ import com.mergebine.jopenai.mappers.ModelMapper;
 import com.mergebine.jopenai.model.Error;
 import com.mergebine.jopenai.model.Model;
 import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpResponse;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.apache.hc.core5.http.HttpHeaders;
+import org.apache.hc.core5.http.HttpResponse;
 import org.apache.hc.core5.http.ParseException;
 import org.apache.hc.core5.http.io.entity.EntityUtils;
 import org.apache.hc.core5.http.io.support.ClassicRequestBuilder;
@@ -45,7 +45,7 @@ public class OpenAiV1Client implements OpenAiClient {
     }
 
     @Override
-    public List<Model> getModels() throws IOException, OpenApiException {
+    public Result<List<Model>> getModels() throws IOException {
 
         String endpoint = "/v1/models";
 
@@ -53,22 +53,23 @@ public class OpenAiV1Client implements OpenAiClient {
         setConfigHeaders(requestBuilder, endpoint);
         ClassicHttpRequest request = requestBuilder.build();
 
-        try (CloseableHttpResponse response = httpClient.execute(request)) {
+        return httpClient.execute(request, response -> {
+            try {
+                String responseBody = EntityUtils.toString(response.getEntity());
+                if (response.getCode() / 100 != 2) {
+                    ErrorWrapper apiError = objectMapper.readValue(responseBody, ErrorWrapper.class);
+                    Error error = ErrorMapper.INSTANCE.fromApi(apiError.getError());
+                    return Result.ofException(new OpenApiException(createNotSuccessfulExceptionMessage(requestBuilder, response), error));
+                }
 
-            String responseBody = EntityUtils.toString(response.getEntity());
-            if (response.getCode() / 100 != 2) {
-                ErrorWrapper apiError = objectMapper.readValue(responseBody, ErrorWrapper.class);
-                Error error = ErrorMapper.INSTANCE.fromApi(apiError.getError());
-                throw new OpenApiException(createNotSuccessfulExceptionMessage(requestBuilder, response), error);
+                TypeReference<ResponseWrapper<List<ModelResponse>>> typeRef = new TypeReference<>() {
+                };
+                ResponseWrapper<List<ModelResponse>> apiResponse = objectMapper.readValue(responseBody, typeRef);
+                return Result.of(ModelMapper.INSTANCE.fromApiList(apiResponse.getData()));
+            } catch (ParseException | JsonProcessingException e) {
+                return Result.ofException(new OpenApiException("Could not parse response from " + requestBuilder.getMethod() + " " + requestBuilder.getPath(), e));
             }
-
-            TypeReference<ResponseWrapper<List<ModelResponse>>> typeRef = new TypeReference<>() {
-            };
-            ResponseWrapper<List<ModelResponse>> apiResponse = objectMapper.readValue(responseBody, typeRef);
-            return ModelMapper.INSTANCE.fromApiList(apiResponse.getData());
-        } catch (ParseException | JsonProcessingException e) {
-            throw new OpenApiException("Could not parse response from " + requestBuilder.getMethod() + " " + requestBuilder.getPath(), e);
-        }
+        });
     }
 
     private void setConfigHeaders(ClassicRequestBuilder classicRequestBuilder, String endpoint) {
@@ -79,7 +80,7 @@ public class OpenAiV1Client implements OpenAiClient {
                 .addHeader(HttpHeaders.AUTHORIZATION, "Bearer " + openAiApiConfig.getToken());
     }
 
-    private static @NotNull String createNotSuccessfulExceptionMessage(ClassicRequestBuilder requestBuilder, CloseableHttpResponse response) {
+    private static @NotNull String createNotSuccessfulExceptionMessage(ClassicRequestBuilder requestBuilder, HttpResponse response) {
         return "Request to " + requestBuilder.getMethod() + " " + requestBuilder.getPath() + " returned http code " + response.getCode();
     }
 
