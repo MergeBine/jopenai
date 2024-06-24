@@ -5,7 +5,6 @@ import lombok.RequiredArgsConstructor;
 
 import static java.util.Objects.nonNull;
 
-
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class Result<T> {
 

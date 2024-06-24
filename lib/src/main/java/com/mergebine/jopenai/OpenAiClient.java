@@ -7,5 +7,5 @@ import java.util.List;
 
 public interface OpenAiClient extends AutoCloseable {
 
-    Result<List<Model>> getModels() throws IOException, OpenApiException;
+    Result<List<Model>> getModels() throws IOException;
 }
